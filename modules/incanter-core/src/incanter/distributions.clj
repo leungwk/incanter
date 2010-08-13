@@ -24,7 +24,7 @@
   (:use [clojure.contrib.def :only (defvar defvar-)]
         [clojure.set :only (intersection)]
         [clojure.contrib.combinatorics :only (combinations)]
-        [incanter.core :only (gamma pow regularized-beta)]))
+        [incanter.core :only (decomp-cholesky det gamma pow regularized-beta identity-matrix matrix ncol trans mmult minus plus vectorize)]))
 
 ;; NOTE: as of this writing, (doc pdf/cdf/...) do not show the doc strings.
 ;; including them for when this bug is fixed.
@@ -794,3 +794,40 @@
     (pdf (uniform-distribution 1.0 10.0) 5)"
   ([] (uniform-distribution 0.0 1.0)) ; since "0 1" not implicitly promoted, otheriwse no matching ctor...
   ([min max] (DoubleUniform-rec. min max)))
+
+(defrecord mvn-rec [mu sigma chol]
+  Distribution
+  (pdf [d v] nil
+       ;; (let [k (count mu)]
+;;                (/ 1 (* (Math/pow (* 2 Math/PI) (/ k 2))
+;;                        (det chol) ; = (|chol||chol^*|)^(1/2)
+
+;; )))
+)
+  (cdf [d v] nil)
+  (draw [d] (let [k (count mu)
+                  nd (normal-distribution)
+                  z (matrix (repeatedly k #(draw nd)))]
+              (plus mu (mmult chol z))))
+  (support [d] nil)
+  (mean [d] mu)
+  (variance [d] sigma))
+
+(defn mvn-distribution
+  "Returns a multivariate normal distribution that implements the incanter.distributions.Distribution protocol.
+
+  Arguments:
+    mu         (default [0])
+    sigma      (default (identity-matrix (count mean)))
+
+  See also:
+    Distribution, pdf, cdf, draw, support
+
+  References:
+    http://en.wikipedia.org/wiki/Multivariate_normal_distribution
+
+  Example:
+    ()
+"
+  ([] (mvn-distribution [0] [1]))
+  ([mu sigma] (mvn-rec. (matrix mu) sigma (decomp-cholesky sigma)))) ; TODO check later if sigma is positive-definite

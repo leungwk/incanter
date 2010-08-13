@@ -17,6 +17,7 @@
   (:use clojure.test
         clojure.set
         incanter.distributions
+        [incanter.core :only (matrix plus minus vectorize)]
         [incanter.stats :exclude (mean variance)]))
 
 ;; testing helpers
@@ -398,7 +399,7 @@
 
     (is (= mu (mean dist)))
 
-    (is (<= (Math/abs (- sdsd (variance dist))) 0.0001))) ; TODO fix
+    (is (<= (Math/abs (- sdsd (variance dist))) 0.0001)))
 )
 
 (deftest poisson-distribution-tests
@@ -432,3 +433,51 @@
 
     (is (= (/ (* (- ub lb) (- ub lb))
               12) (variance dist)))))
+
+(defn mean-vec [vs]
+  (map #(Math/round (/ % (count vs))) (reduce plus vs)))
+
+(defn covariance-matrix [coll]
+  (matrix (map (fn [x]
+                 (map #(covariance x %) coll))
+               coll)))
+
+(deftest mvn-distribution-tests
+  (let [mu [7 5]
+        sigma (matrix [[2 1.5] [1.5 3]]) ; isa covariance matrix
+        dist (mvn-distribution mu sigma)
+        nsamp 1000
+        dist-data (repeatedly nsamp #(draw dist))
+
+        data-unzipped (apply map vector dist-data)
+        xs (nth data-unzipped 0)
+        ys (nth data-unzipped 1)
+
+        S (covariance-matrix (list xs ys))]
+    (is (= (count dist-data) nsamp))
+    (is (= (mean-vec dist-data)))
+
+    ;; ;; incorrect (should look at Mardia's test)
+    ;; http://www.colostate.edu/Services/ACNS/swmanuals/sasdoc/sashtml/ets/chap14/sect38.htm
+    ;; or http://nitro.biosci.arizona.edu/zbook/volume_2/chapters/vol2_A2.html
+    ;; (print "S 2x2: ")
+    ;; (println S)
+    ;; (is (= (every? #(= % 0) (map #(Math/round %) (vectorize (minus S sigma))))))
+    ;; (is (not (= (every? #(= % 0) (map #(Math/round %) (vectorize (minus S (matrix [[3 1.5] [1.5 2]]))))))))
+
+)
+
+  (let [mu [7 5 3]
+        sigma (matrix [[4.5 1 2] [1 5.5 3] [2 3 3.5]]) ; isa covariance matrix
+        dist (mvn-distribution mu sigma)
+        nsamp 1000
+        dist-data (repeatedly nsamp #(draw dist))
+
+        data-unzipped (apply map vector dist-data)
+        xs (nth data-unzipped 0)
+        ys (nth data-unzipped 1)
+        zs (nth data-unzipped 2)
+
+        S (covariance-matrix (list xs ys zs))]
+    (is (= (count dist-data) nsamp))
+    (is (= (mean-vec dist-data)))))
